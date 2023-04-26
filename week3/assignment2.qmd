@@ -1,0 +1,83 @@
+```{r}
+library(DBI)
+library(RSQLite)
+```
+
+
+```{r}
+eds213 <- dbConnect(RSQLite::SQLite(), "my-db.sqlite")
+```
+
+```{r}
+dbWriteTable(eds213, "SITE", site)
+dbWriteTable(eds213, "ASDN_Bird_nests", ASDN_Bird_nests)
+dbWriteTable(eds213, "ASDN_Bird_eggs", ASDN_Bird_eggs)
+dbWriteTable(eds213, "species", species)
+```
+
+```{r}
+dbGetQuery(eds213,'SELECT "Site name", "Total_Study_Plot_Area_(ha)" FROM SITE
+           ORDER BY "Total_Study_Plot_Area_(ha)" DESC
+           LIMIT 1')
+
+```
+
+```{r}
+dbGetQuery(
+  eds213,
+  'SELECT "Site name", "Total_Study_Plot_Area_(ha)"
+           FROM SITE
+           WHERE "Total_Study_Plot_Area_(ha)" = (SELECT MAX("Total_Study_Plot_Area_(ha)") FROM SITE)')
+```
+```{r}
+dbGetQuery(
+  eds213,
+  'SELECT "Site name", "Total_Study_Plot_Area_(ha)"
+   FROM SITE
+   WHERE "Total_Study_Plot_Area_(ha)" = (SELECT MAX("Total_Study_Plot_Area_(ha)") FROM SITE)'
+)
+
+```
+
+```{r}
+
+
+# Replace this with your actual SQLite connection
+#con <- dbConnect(RSQLite::SQLite(), "your_database_file.sqlite")
+
+# SQL query with the corrected column names
+query <- '
+WITH Egg_Volumes AS (
+    SELECT Nest_ID, 4.0/3.0 * 3.14 * (Width/2.0) * (Width/2.0) * (Length/2.0) AS Volume
+    FROM ASDN_Bird_eggs
+),
+Averages AS (
+    SELECT Nest_ID, AVG(Volume) AS Avg_volume
+    FROM Egg_Volumes
+    GROUP BY Nest_ID
+),
+Species_Avg_Volume AS (
+    SELECT Species, MAX(Avg_volume) AS Max_avg_volume
+    FROM ASDN_Bird_nests
+    JOIN Averages USING (Nest_ID)
+    GROUP BY Species
+)
+SELECT S.Scientific_name, Max_avg_volume
+FROM Species_Avg_Volume AS V
+JOIN species AS S ON V.Species = S.Code
+ORDER BY Max_avg_volume DESC;
+'
+
+# Execute the query and store the result in a data frame
+result <- dbGetQuery(eds213, query)
+
+# Print the result
+result
+
+
+```
+```{r}
+# Close the database connection
+dbDisconnect(eds213)
+```
+
